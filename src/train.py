@@ -6,6 +6,7 @@ Expected layout (produced by scripts/prepare_dataset.py):
 
 Run:  python -m src.train
 """
+
 import random
 from pathlib import Path
 
@@ -33,8 +34,7 @@ class OreDataset(Dataset):
         img_p, mask_p = self.pairs[i]
         img = cv2.imdecode(np.fromfile(str(img_p), np.uint8), cv2.IMREAD_COLOR)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        mask = cv2.imdecode(np.fromfile(str(mask_p), np.uint8),
-                            cv2.IMREAD_GRAYSCALE)
+        mask = cv2.imdecode(np.fromfile(str(mask_p), np.uint8), cv2.IMREAD_GRAYSCALE)
         out = self.transform(image=img, mask=mask)
         return out["image"], out["mask"].long()
 
@@ -43,25 +43,29 @@ def get_transforms(crop: int, train: bool):
     norm = [A.Normalize(), ToTensorV2()]
     if not train:
         return A.Compose([A.PadIfNeeded(crop, crop), A.CenterCrop(crop, crop), *norm])
-    return A.Compose([
-        A.PadIfNeeded(crop, crop),
-        A.RandomCrop(crop, crop),
-        A.HorizontalFlip(p=0.5),
-        A.VerticalFlip(p=0.5),
-        A.RandomRotate90(p=0.5),
-        A.RandomBrightnessContrast(0.2, 0.2, p=0.7),
-        A.GaussNoise(p=0.3),
-        A.ElasticTransform(alpha=40, sigma=6, p=0.2),
-        *norm,
-    ])
+    return A.Compose(
+        [
+            A.PadIfNeeded(crop, crop),
+            A.RandomCrop(crop, crop),
+            A.HorizontalFlip(p=0.5),
+            A.VerticalFlip(p=0.5),
+            A.RandomRotate90(p=0.5),
+            A.RandomBrightnessContrast(0.2, 0.2, p=0.7),
+            A.GaussNoise(p=0.3),
+            A.ElasticTransform(alpha=40, sigma=6, p=0.2),
+            *norm,
+        ]
+    )
 
 
 class DiceCE(torch.nn.Module):
     def __init__(self, class_weights):
         super().__init__()
         self.ce = torch.nn.CrossEntropyLoss(
-            weight=torch.tensor(class_weights, dtype=torch.float32))
+            weight=torch.tensor(class_weights, dtype=torch.float32)
+        )
         import segmentation_models_pytorch as smp
+
         self.dice = smp.losses.DiceLoss(mode="multiclass")
 
     def forward(self, logits, target):
@@ -102,8 +106,14 @@ def main(cfg: TrainConfig | None = None):
 
     train_ds = OreDataset(train_pairs, get_transforms(cfg.crop_size, True))
     val_ds = OreDataset(val_pairs, get_transforms(cfg.crop_size, False))
-    train_dl = DataLoader(train_ds, cfg.batch_size, shuffle=True,
-                          num_workers=2, pin_memory=True, drop_last=True)
+    train_dl = DataLoader(
+        train_ds,
+        cfg.batch_size,
+        shuffle=True,
+        num_workers=2,
+        pin_memory=True,
+        drop_last=True,
+    )
     val_dl = DataLoader(val_ds, cfg.batch_size, num_workers=0)
 
     model = build_model(cfg.arch, cfg.encoder, cfg.num_classes).to(device)
@@ -141,9 +151,10 @@ def main(cfg: TrainConfig | None = None):
         print(f"  val mIoU={miou:.4f}  per-class={[f'{v:.3f}' for v in per_class]}")
         if miou > best_miou:
             best_miou = miou
-            torch.save({"model": model.state_dict(),
-                        "miou": miou,
-                        "cfg": vars(cfg)}, out_dir / "best.pt")
+            torch.save(
+                {"model": model.state_dict(), "miou": miou, "cfg": vars(cfg)},
+                out_dir / "best.pt",
+            )
             print(f"  saved best.pt (mIoU={miou:.4f})")
 
 
