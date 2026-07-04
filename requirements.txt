@@ -1,0 +1,14 @@
+--index-url https://download.pytorch.org/whl/cpu
+--extra-index-url https://pypi.org/simple
+torch>=2.1
+torchvision>=0.16
+segmentation-models-pytorch>=0.3.3
+opencv-python-headless>=4.9
+scikit-image>=0.22
+tifffile>=2024.1.30
+numpy>=1.26
+pandas>=2.1
+albumentations>=1.4
+streamlit>=1.35
+plotly>=5.20
+tqdm>=4.66

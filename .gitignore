@@ -1,0 +1,18 @@
+# data and heavy artifacts live on the cloud drive, not in git
+data/
+outputs/
+reports/
+models/*.pt
+!models/best.pt
+models/train_log*
+
+# environments / caches
+.venv/
+__pycache__/
+*.pyc
+.idea/
+.claude/
+
+# OS noise
+Thumbs.db
+.DS_Store
