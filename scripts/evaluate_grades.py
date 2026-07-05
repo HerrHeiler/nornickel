@@ -27,16 +27,22 @@ from src.pipeline import OrePipeline
 LABELS = [ORE_REGULAR, ORE_REFRACTORY, ORE_TALC]
 
 
-def collect_files(raw: Path, limit: int | None):
+def collect_files(raw: Path, limit: int | None, offset: int = 0,
+                  ch2_only: bool = False):
     for rel, label in GRADE_FOLDERS.items():
+        if ch2_only and "ч2" not in rel:
+            continue
         folder = raw / Path(rel)
         if not folder.exists():
             print(f"skip missing folder: {folder}")
             continue
         files = sorted(p for p in folder.iterdir()
                        if p.is_file() and p.suffix.lower() in IMAGE_EXTS)
-        if limit:
-            files = files[:limit]
+        n = limit or len(files)
+        if offset and len(files) > offset + n:
+            files = files[offset:offset + n]
+        else:
+            files = files[-n:]
         for p in files:
             yield p, label
 
@@ -50,14 +56,23 @@ def main():
                     help="keep 1.0: speck-size thresholds and U-Net training "
                          "crops are calibrated at native resolution")
     ap.add_argument("--out", default="reports/eval.csv")
+    ap.add_argument("--offset", type=int, default=0,
+                    help="skip first N files per folder (avoid train overlap)")
+    ap.add_argument("--ch2-only", action="store_true",
+                    help="only ч2 folders (ч1 fully participates in training)")
+    ap.add_argument("--weights", default=None,
+                    help="checkpoint path override")
     args = ap.parse_args()
 
     cfg = InferenceConfig(downscale_factor=args.downscale)
+    if args.weights:
+        cfg.weights_path = args.weights
     pipeline = OrePipeline(cfg)
 
     rows = []
     t0 = time.time()
-    for i, (path, label) in enumerate(collect_files(Path(args.raw), args.limit)):
+    for i, (path, label) in enumerate(collect_files(Path(args.raw), args.limit,
+                                                    args.offset, args.ch2_only)):
         try:
             art = pipeline.process(path)
         except Exception as e:

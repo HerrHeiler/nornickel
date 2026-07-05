@@ -35,7 +35,8 @@ import numpy as np
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from src.config import ANNOT_HSV_HI, ANNOT_HSV_LO, CLASS_TALC
+from src.config import (ANNOT_HSV_HI, ANNOT_HSV_LO, CLASS_FINE,
+                        CLASS_REGULAR, CLASS_TALC)
 from src.model import ClassicalSegmenter
 from src.preprocessing import load_image, preprocess
 
@@ -45,6 +46,10 @@ NEG_DIRS = [
     "Фото руд по сортам. ч1/Рядовые руды",
     "Фото руд по сортам. ч1/Труднообогатимые руды",
 ]
+CH2_PRIOR = {
+    "Фото руд по сортам. ч2/рядовые": CLASS_REGULAR,
+    "Фото руд по сортам. ч2/тонкие": CLASS_FINE,
+}
 
 
 def annotation_line(img_rgb: np.ndarray) -> np.ndarray:
@@ -194,6 +199,9 @@ def main():
     ap.add_argument("--tile", type=int, default=512)
     ap.add_argument("--neg-limit", type=int, default=30,
                     help="photos per talc-free folder used as negatives")
+    ap.add_argument("--ch2-limit", type=int, default=0,
+                    help="photos per ч2 grade folder with folder-prior "
+                         "sulfide labels (regular/fine forced by the folder)")
     ap.add_argument("--debug", action="store_true",
                     help="only write talc-fill QA overlays to <out>/debug")
     args = ap.parse_args()
@@ -246,6 +254,22 @@ def main():
             total += tile_pair(model_input, weak_mask, args.tile, out_img,
                                out_mask, f"neg_{p.stem}", min_fg_frac=0.01)
         print(f"{rel}: negatives done, crops so far={total}")
+
+    if args.ch2_limit:
+        for rel, sulf_cls in CH2_PRIOR.items():
+            folder = raw / Path(rel)
+            files = sorted(p for p in folder.iterdir()
+                           if p.is_file() and p.suffix.lower() in IMAGE_EXTS)
+            for p in files[:args.ch2_limit]:
+                img = load_image(p)
+                weak_mask, _ = seg(img)
+                weak_mask[weak_mask == CLASS_TALC] = 0
+                weak_mask[weak_mask > 0] = sulf_cls
+                model_input = preprocess(img, illum=True)
+                total += tile_pair(model_input, weak_mask, args.tile, out_img,
+                                   out_mask, f"ch2_{sulf_cls}_{p.stem}",
+                                   min_fg_frac=0.01)
+            print(f"{rel}: folder-prior done, crops so far={total}")
 
     print(f"Total crops: {total}")
 
