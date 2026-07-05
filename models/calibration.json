@@ -1,5 +1,6 @@
 {
-  "talc_gain": 0.3505,
+  "talc_gain": 0.5,
   "talc_bias": 0.0,
-  "fine_ratio_thr": 70.0
+  "cv_talc_gain": 1.0,
+  "fine_ratio_thr": 55.0
 }

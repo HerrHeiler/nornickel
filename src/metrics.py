@@ -19,11 +19,14 @@ class ClassificationResult:
     fine_of_sulfides_pct: float
     metrics_df: pd.DataFrame
     conclusion: str
+    talc_raw_pct: float = 0.0        # uncalibrated DL/mask talc share
+    cv_talc_raw_pct: float = 0.0     # uncalibrated classical talc share
 
 
 def compute_metrics(mask: np.ndarray, sample_mask: np.ndarray | None = None,
                     px_size_um: float | None = None,
-                    calib: dict | None = None) -> ClassificationResult:
+                    calib: dict | None = None,
+                    cv_talc_pct: float | None = None) -> ClassificationResult:
     calib = {**DEFAULT_CALIB, **(calib or {})}
     valid = np.ones(mask.shape, bool) if sample_mask is None else sample_mask.astype(bool)
     total = int(valid.sum())
@@ -32,8 +35,14 @@ def compute_metrics(mask: np.ndarray, sample_mask: np.ndarray | None = None,
               for c in (CLASS_REGULAR, CLASS_FINE, CLASS_TALC)}
     pct = {c: 100.0 * v / max(total, 1) for c, v in counts.items()}
 
-    pct[CLASS_TALC] = float(np.clip(
-        calib["talc_gain"] * pct[CLASS_TALC] + calib["talc_bias"], 0.0, 100.0))
+    # hybrid talc measure: the U-Net misses talc on imagery unlike its
+    # training set, the classical speck-density detector does not — take
+    # the max of the two independently calibrated measurements
+    talc_raw = pct[CLASS_TALC]
+    talc_cal = calib["talc_gain"] * talc_raw + calib["talc_bias"]
+    if cv_talc_pct is not None and calib["cv_talc_gain"] > 0:
+        talc_cal = max(talc_cal, calib["cv_talc_gain"] * cv_talc_pct)
+    pct[CLASS_TALC] = float(np.clip(talc_cal, 0.0, 100.0))
 
     sulf_px = counts[CLASS_REGULAR] + counts[CLASS_FINE]
     sulf_pct = 100.0 * sulf_px / max(total, 1)
@@ -84,6 +93,8 @@ def compute_metrics(mask: np.ndarray, sample_mask: np.ndarray | None = None,
         fine_of_sulfides_pct=fine_of_sulf,
         metrics_df=df,
         conclusion=conclusion,
+        talc_raw_pct=talc_raw,
+        cv_talc_raw_pct=float(cv_talc_pct or 0.0),
     )
 
 

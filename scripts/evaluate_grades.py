@@ -84,6 +84,8 @@ def main():
             "true": label,
             "pred": res.ore_type,
             "talc_pct": round(res.talc_pct, 2),
+            "talc_raw": round(res.talc_raw_pct, 2),
+            "cv_talc_raw": round(res.cv_talc_raw_pct, 2),
             "sulfide_pct": round(res.sulfide_total_pct, 2),
             "regular_of_sulf": round(res.regular_of_sulfides_pct, 2),
             "fine_of_sulf": round(res.fine_of_sulfides_pct, 2),

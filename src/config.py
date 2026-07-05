@@ -30,6 +30,7 @@ CALIB_PATH = "models/calibration.json"
 DEFAULT_CALIB = {
     "talc_gain": 1.0,
     "talc_bias": 0.0,
+    "cv_talc_gain": 0.0,      # hybrid: weight of the classical talc measure
     "fine_ratio_thr": 50.0,
 }
 

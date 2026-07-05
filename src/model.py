@@ -88,12 +88,8 @@ class ClassicalSegmenter:
         self.min_regular_area = min_regular_area
         self.min_grain_area = min_grain_area
 
-    def __call__(self, img: np.ndarray, sample_mask: np.ndarray | None = None
-                 ) -> tuple[np.ndarray, np.ndarray]:
-        gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-        if sample_mask is None:
-            sample_mask = np.ones_like(gray, np.uint8)
-
+    def _sulfide_and_talc(self, gray: np.ndarray, sample_mask: np.ndarray
+                          ) -> tuple[np.ndarray, np.ndarray]:
         med = float(np.median(gray[sample_mask > 0]))
         thr_sulf = float(np.clip(self.sulfide_rel * med, *self.sulfide_abs_range))
         sulfide = ((gray >= thr_sulf) & (sample_mask > 0)).astype(np.uint8)
@@ -115,6 +111,24 @@ class ClassicalSegmenter:
                 & (sulfide == 0)).astype(np.uint8)
         talc = cv2.morphologyEx(talc, cv2.MORPH_CLOSE, np.ones((9, 9), np.uint8))
         talc = cv2.morphologyEx(talc, cv2.MORPH_OPEN, np.ones((9, 9), np.uint8))
+        return sulfide, talc
+
+    def talc_share(self, img: np.ndarray,
+                   sample_mask: np.ndarray | None = None) -> float:
+        """Classical talc share (%) — the second leg of the hybrid measure."""
+        gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+        if sample_mask is None:
+            sample_mask = np.ones_like(gray, np.uint8)
+        _, talc = self._sulfide_and_talc(gray, sample_mask)
+        return 100.0 * float(talc[sample_mask > 0].mean())
+
+    def __call__(self, img: np.ndarray, sample_mask: np.ndarray | None = None
+                 ) -> tuple[np.ndarray, np.ndarray]:
+        gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+        if sample_mask is None:
+            sample_mask = np.ones_like(gray, np.uint8)
+
+        sulfide, talc = self._sulfide_and_talc(gray, sample_mask)
 
         mask = np.full(gray.shape, CLASS_BACKGROUND, np.uint8)
         mask[talc > 0] = CLASS_TALC

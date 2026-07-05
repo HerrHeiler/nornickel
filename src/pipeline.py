@@ -64,6 +64,7 @@ class OrePipeline:
         smask = sample_region_mask(raw)
 
         cb(0.15, "Сегментация")
+        cv_talc = None
         if self.model is not None:
             from .tiling import predict_large_image
             mask, conf = predict_large_image(
@@ -74,6 +75,8 @@ class OrePipeline:
                 progress_cb=lambda p: cb(0.15 + 0.6 * p, "Сегментация"),
             )
             mask[smask == 0] = 0
+            # second leg of the hybrid talc measure (see compute_metrics)
+            cv_talc = self.baseline.talc_share(raw, smask)
         else:
             mask, conf = self.baseline(raw, smask)
 
@@ -81,7 +84,8 @@ class OrePipeline:
         mask = cleanup_mask(mask, self.cfg.min_object_px)
 
         cb(0.85, "Расчёт метрик")
-        result = compute_metrics(mask, smask, px_size_um, calib=self.calib)
+        result = compute_metrics(mask, smask, px_size_um, calib=self.calib,
+                                 cv_talc_pct=cv_talc)
 
         cb(0.92, "Построение визуализации")
         overlay = make_overlay(img, mask)

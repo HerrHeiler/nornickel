@@ -168,9 +168,14 @@ def main(cfg: TrainConfig | None = None, aug: str = "base",
         sched.step()
 
         miou, per_class = evaluate(model, val_dl, cfg.num_classes, device)
-        print(f"  val mIoU={miou:.4f}  per-class={[f'{v:.3f}' for v in per_class]}")
-        if miou > best_miou:
-            best_miou = miou
+        # select by mean IoU of the ORE classes: the easy background class
+        # otherwise dominates the average and masks a talc collapse
+        fg_miou = float(sum(per_class[1:]) / (cfg.num_classes - 1))
+        print(f"  val mIoU={miou:.4f} fg={fg_miou:.4f} "
+              f"per-class={[f'{v:.3f}' for v in per_class]}")
+        if fg_miou > best_miou:
+            best_miou = fg_miou
+            miou = fg_miou
             torch.save({"model": model.state_dict(),
                         "miou": miou,
                         "cfg": vars(cfg)}, out_dir / "best.pt")
